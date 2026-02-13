@@ -1,0 +1,15 @@
+// Hint files help the Visual Studio IDE interpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define __packed 
+#define __packed __declspec(align(1))
+#define __softfp
+#define __irq
+#define __irq __declspec(naked)
+#define __align(v)
+#define __align(v) __declspec(align(v))
+#define __attribute__(v)
+#define _UCRT_DISABLE_CLANG_WARNINGS
+#define __func__ __FUNCTION__
+#define restrict
+#define section(v) static const char _section = v;

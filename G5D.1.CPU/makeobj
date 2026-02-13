@@ -1,0 +1,200 @@
+
+##################################################################################################
+
+!ifndef version
+version = Release
+!endif
+
+##################################################################################################
+
+curdir = $+ $(%cdrive):$(%cwd) $-
+hdir = cpp
+libdir = $(curdir)\..\..\G_LIBS
+bindir = $(%ARMCC50BIN)
+ghdir = $(curdir)\..\Include    #$(curdir)\..\Include
+
+!ifeq version Debug
+
+debug_compiler_options = -O0 --debug -D_DEBUG
+debug_linker_options = 
+libsuffix=d
+
+!else ifeq version Win32_Debug
+
+debug_compiler_options = -Od #/analyze
+debug_compiler_options6 = -Od
+debug_linker_options = 
+libsuffix=Win32
+	
+!else
+
+debug_compiler_options = -O3 -Otime --debug 
+debug_linker_options = 
+libsuffix=r
+
+!endif 
+
+##################################################################################################
+
+target_name = G5D.1.CPU #$(targetcpu)
+
+##################################################################################################
+
+!ifeq targetcpu SAME53
+
+cpu_compiler_options = --cpu=CORTEX-M4.fp.sp --thumb -DSAME53J18
+cpu_asm_options = --cpu CORTEX-M4.fp.sp --apcs /interwork --pd "__PROGNAME__ SETS \"KAPCAP G5D.1(2IG43_UPR)-1.1\""
+cpu_link_options = --cpu CORTEX-M4.fp.sp
+cpu_obj = $(objdir)\startup_CM4.o
+cpu_scatter = $(libdir)\Scatter\SAME53_18_NO_BOOTLOADER.sct
+
+!else
+
+cpu_compiler_options = 
+cpu_asm_options =
+cpu_link_options = 
+cpu_obj = 
+cpu_scatter = 
+
+!endif
+
+##################################################################################################
+
+libname = $(libdir)\$(targetcpu)_$(libsuffix).a
+
+##################################################################################################
+
+.ERASE
+.EXTENSIONS:
+.EXTENSIONS: .exe .o .cpp .h .s .d
+
+##################################################################################################
+
+.cpp:	$(cppdir)
+.o:		$(objdir)
+.h:		$(hdir)
+.s: 	$(cppdir);$(libdir)\cpp\ARM
+.d:		$(objdir)
+
+
+##################################################################################################
+
+.BEFORE
+	@if NOT EXIST $(objdir) @md $(objdir) >nul
+	@call echo Building $(version) version ...
+	@call buildnum.bat
+
+
+##################################################################################################--diag_suppress=68,368,1165,1299,3017
+
+compiler_options = $(debug_compiler_options) $(cpu_compiler_options) --gnu --asm --interleave -g -c --diag_style=ide &
+	  --feedback "$(objdir)\$(target_name).fed"  &
+	 -D__MICROLIB -DCPU_$(targetcpu) --no_depend_system_headers --reduce_paths -J$(libdir)\cpp,"$(%ARMCC50INC)" -I$(ghdir)
+
+##################################################################################################
+
+asm_options = $(cpu_asm_options) -g --xref --diag_style=ide --pd "__MICROLIB SETA 1" --pd "CPU_$(targetcpu) SETA 1" --cpreproc
+
+##################################################################################################
+
+link_options = $(cpu_link_options) --bestdebug --strict --map --xref --callgraph --symbols --summary_stderr --library_type=microlib
+  
+##################################################################################################-wd4996
+
+win32_compiler_options = $(debug_compiler_options) -nologo -DWIN32 -D_DEBUG -c -Z7 -Zp  -I"$(libdir)\cpp" -I$(curdir)\..\Include -I$(curdir)\..\..\Include
+
+##################################################################################################
+
+win32_link_options = -NOLOGO -SUBSYSTEM:CONSOLE -DEBUG -MACHINE:X86 kernel32.lib user32.lib gdi32.lib WS2_32.lib
+  
+##################################################################################################
+
+!include $(objdir)\mkoutcpp
+!include $(objdir)\mkoutobj
+
+##################################################################################################
+#
+#	$$ 	represents the character "$"
+#	$# 	represents the character "#"
+#	$@ 	full file name of the target
+#	$* 	target with the extension removed
+#	$< 	list of all dependents
+#	$? 	list of dependents that are younger than the target
+#	
+#	a:\dir\target.ext : b:\dir1\dep1.ex1 c:\dir2\dep2.ex2
+#	
+#	$^@ 	a:\dir\target.ext
+#	$^* 	a:\dir\target
+#	$^& 	target
+#	$^. 	target.ext
+#	$^: 	a:\dir\
+#		
+#	$[@ 	b:\dir1\dep1.ex1
+#	$[* 	b:\dir1\dep1
+#	$[& 	dep1
+#	$[. 	dep1.ex1
+#	$[: 	b:\dir1\
+#		
+#	$]@ 	c:\dir2\dep2.ex2
+#	$]* 	c:\dir2\dep2
+#	$]& 	dep2
+#	$]. 	dep2.ex2
+#	$]: 	c:\dir2\
+#
+##################################################################################################
+!ifneq version Win32_Debug
+
+$(objdir)\$(target_name).axf : $(cpu_obj) $(modules_obj) $(libname)			
+	@echo Linking ...
+	@$(bindir)\armlink	$(link_options) &
+	--feedback "$^*.fed" &
+	--scatter $(cpu_scatter) &
+	--list "$^&.map" &
+	-o "$^@" $(cpu_obj) $(modules_obj) $(libname)
+	@rem $(bindir)\fromelf --i32 --output .\OBJ\$^&.hex $^@ 
+	@$(bindir)\fromelf --bin --output .\OBJ\$^&.bin $^@ 
+	@$(bindir)\fromelf --text -z $^@ 
+	@if NOT EXIST .\OBJ @md .\OBJ >nul
+	@copy /Y $^@ .\OBJ\ >nul
+
+!else
+
+$(objdir)\$(target_name).exe : makefile $(libname) $(modules_obj)	
+	@echo Linking ...
+	@call link $(win32_link_options) -OUT:$^@ $(objdir)\*.o $(libname)
+
+!endif
+	
+##################################################################################################
+
+!ifneq version Win32_Debug
+
+##################################################################################################
+
+!include $(objdir)\mkoutdep
+
+##################################################################################################
+
+.cpp.o:
+	@echo Compiling $[. ...
+	@$(bindir)\armcc $(compiler_options) --depend="$(objdir)\$^&.d" -o "$(objdir)\$^." $[@
+
+##################################################################################################
+
+.s.o:
+	@echo Assembling $[. ...
+	@$(bindir)\armasm $(asm_options) --list $(objdir)\$^&.lst  -o $(objdir)\$^. $[@	
+
+##################################################################################################
+
+!else
+
+##################################################################################################
+
+.cpp.o:	.AUTODEPEND
+	@cl $(win32_compiler_options) -Fo"$(objdir)\$^." $[@
+
+##################################################################################################
+
+!endif
+

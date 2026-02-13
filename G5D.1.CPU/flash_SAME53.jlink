@@ -1,0 +1,6 @@
+SWDSelect
+speed 2000
+r
+exec device = ATSAME53J18
+loadbin obj\G5D.1.CPU.bin,0x0000
+exit
