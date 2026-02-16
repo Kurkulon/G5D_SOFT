@@ -120,15 +120,16 @@
 
 	#define EVENT_DNNKB			0
 	#define EVENT_DNNKM			1
-	#define EVENT_WIN			2
-	#define EVENT_MANR_1		3
-	#define EVENT_MANR_2		4
-	#define EVENT_BTCC_RETRG	5
-	#define EVENT_MTCC_RETRG	6
+	#define EVENT_GEN			2
+	#define EVENT_WIN			3
+	#define EVENT_MANR_1		4
+	#define EVENT_MANR_2		5
+	//#define EVENT_BTCC_RETRG	6
+	//#define EVENT_MTCC_RETRG	7
 
 	// ++++++++++++++	TC	++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-	#define	WinTC				TC0
+	#define	WIN_TC				TC0
 	//#define	DAC_TC				TC1
 	//#define MANT_TC			TC2
 	#define MANI_TC				TC3

@@ -14,6 +14,8 @@
 //#include <math.h>
 #include "spi.h"
 
+//#define WIN_TEST
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 static u32 SPI_CS_MASK[] = { SYNC };
@@ -94,6 +96,15 @@ static void WDT_Init()
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+// GENTCC_OVF ->	WINTC_EVU(RETRIGER)
+// 					BTCC_EV1(RETRIGER)
+//					MTCC_EV1(RETRIGER)
+// 
+// DNNKB_EXTINT ->	DNNKB_EVSYS_CHANNEL -> BTCC0_EVSYS_USER(BTCC_EV_0)
+// DNNKM_EXTINT ->	DNNKM_EVSYS_CHANNEL -> MTCC0_EVSYS_USER(MTCC_EV_0)
+// 
+// WINTC_OVF ->		BTCC_MC0 EVGEN_MC_0 -> bDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL B_DMA_IRQ(Win_DMA_IRQ)
+//					MTCC_MC0 EVGEN_MC_0 -> mDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL M_DMA_IRQ(Win_DMA_IRQ)
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -123,8 +134,9 @@ static void WDT_Init()
 	#define GENTCC_PRESC_DIV			CONCAT2(TCC_PRESCALER_DIV,GENTCC_PRESC_NUM)
 	#define US2GENTCC(v)				(((v)*(GENTCC_GEN_CLK/GENTCC_PRESC_NUM/1000)+500)/1000)
 
-	#define GENTCC_EVSYS_USER			CONCAT3(EVSYS_USER_, GEN_TCC, _EV_0)
+	//#define GENTCC_EVSYS_USER			CONCAT3(EVSYS_USER_, GEN_TCC, _EV_0)
 	#define GENTCC_EVENT_GEN			CONCAT3(EVGEN_, GEN_TCC, _OVF)
+	#define GENTCC_EVSYS_CHANNEL		(GENTCC_EVENT_GEN|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE)
 
 	#define GENTCC_DMCH_TRIGSRC			CONCAT3(DMCH_TRIGSRC_, GEN_TCC, _OVF)
 
@@ -136,6 +148,15 @@ static void WDT_Init()
 
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// GENTCC_OVF ->	WINTC_EVU(RETRIGER)
+// 					BTCC_EV1(RETRIGER)
+//					MTCC_EV1(RETRIGER)
+// 
+// DNNKB_EXTINT ->	DNNKB_EVSYS_CHANNEL -> BTCC0_EVSYS_USER(BTCC_EV_0)
+// DNNKM_EXTINT ->	DNNKM_EVSYS_CHANNEL -> MTCC0_EVSYS_USER(MTCC_EV_0)
+// 
+// WINTC_OVF ->		BTCC_MC0 EVGEN_MC_0 -> bDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL B_DMA_IRQ(Win_DMA_IRQ)
+//					MTCC_MC0 EVGEN_MC_0 -> mDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL M_DMA_IRQ(Win_DMA_IRQ)
 
 #ifdef B_TCC
 
@@ -163,9 +184,10 @@ static void WDT_Init()
 	#define BTCC_PRESC_DIV			CONCAT2(TCC_PRESCALER_DIV,BTCC_PRESC_NUM)
 	#define US2BTCC(v)				(((v)*(BTCC_GEN_CLK/BTCC_PRESC_NUM)+500000)/1000000)
 
-	#define BTCC_EVENT_GEN			CONCAT3(EVGEN_, B_TCC, _MC_0)
-	#define BTCC0_EVSYS_USER		CONCAT3(EVSYS_USER_, B_TCC, _EV_0)
-	#define BTCC1_EVSYS_USER		CONCAT3(EVSYS_USER_, B_TCC, _EV_1)
+	//#define BTCC_EVENT_GEN		CONCAT3(EVGEN_, B_TCC, _MC_0)
+	#define BTCC_COUNT_EVSYS_USER	CONCAT3(EVSYS_USER_, B_TCC, _EV_0)
+	#define BTCC_RETRG_EVSYS_USER	CONCAT3(EVSYS_USER_, B_TCC, _EV_1)
+	#define BTCC_CAPTR_EVSYS_USER	CONCAT3(EVSYS_USER_, B_TCC, _MC_0)
 
 	#define BTCC_DMCH_TRIGSRC		CONCAT3(DMCH_TRIGSRC_, B_TCC, _MC0) 
 
@@ -177,6 +199,15 @@ static void WDT_Init()
 
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// GENTCC_OVF ->	WINTC_EVU(RETRIGER)
+// 					BTCC_EV1(RETRIGER)
+//					MTCC_EV1(RETRIGER)
+// 
+// DNNKB_EXTINT ->	DNNKB_EVSYS_CHANNEL -> BTCC0_EVSYS_USER(BTCC_EV_0)
+// DNNKM_EXTINT ->	DNNKM_EVSYS_CHANNEL -> MTCC0_EVSYS_USER(MTCC_EV_0)
+// 
+// WINTC_OVF ->		BTCC_MC0 EVGEN_MC_0 -> bDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL B_DMA_IRQ(Win_DMA_IRQ)
+//					MTCC_MC0 EVGEN_MC_0 -> mDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL M_DMA_IRQ(Win_DMA_IRQ)
 
 #ifdef M_TCC
 
@@ -204,9 +235,10 @@ static void WDT_Init()
 	#define MTCC_PRESC_DIV			CONCAT2(TCC_PRESCALER_DIV,MTCC_PRESC_NUM)
 	#define US2MTCC(v)				(((v)*(MTCC_GEN_CLK/MTCC_PRESC_NUM)+500000)/1000000)
 
-	#define MTCC_EVENT_GEN			CONCAT3(EVGEN_, M_TCC, _MC_0)
-	#define MTCC0_EVSYS_USER		CONCAT3(EVSYS_USER_, M_TCC, _EV_0)
-	#define MTCC1_EVSYS_USER		CONCAT3(EVSYS_USER_, M_TCC, _EV_1)
+	//#define MTCC_EVENT_GEN			CONCAT3(EVGEN_, M_TCC, _MC_0)
+	#define MTCC_COUNT_EVSYS_USER	CONCAT3(EVSYS_USER_, M_TCC, _EV_0)
+	#define MTCC_RETRG_EVSYS_USER	CONCAT3(EVSYS_USER_, M_TCC, _EV_1)
+	#define MTCC_CAPTR_EVSYS_USER	CONCAT3(EVSYS_USER_, M_TCC, _MC_0)
 
 	#define MTCC_DMCH_TRIGSRC		CONCAT3(DMCH_TRIGSRC_, M_TCC, _MC0) 
 
@@ -216,140 +248,54 @@ static void WDT_Init()
 	#error  Must defined M_TCC
 #endif
 
-
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-#ifdef PWM_TCC
+#ifdef WIN_TC
 
-	#define PWMTCC						HW::PWM_TCC
-	#define PWM_GEN						CONCAT2(GEN_,PWM_TCC)
-	#define PWM_GEN_CLK					CONCAT2(CLK_,PWM_TCC) 
+	#define winTC						HW::WIN_TC
+	#define WINTC_GEN					CONCAT2(GEN_,WIN_TC)
+	#define WINTC_GEN_CLK				CONCAT2(CLK_,WIN_TC) 
+	#define WINTC_IRQ					CONCAT2(WIN_TC,_IRQ)
+	#define WINTC_GCLK					CONCAT2(GCLK_,WIN_TC)
+	#define WINTC_PID					CONCAT2(PID_,WIN_TC)
 
-	#ifdef TRM_SYNC_IRQ
-	#define PWM_IRQ						(EIC_0_IRQ+PWM_EXTINT)
+	#if (WINTC_GEN_CLK > 100000000)
+			#define WINTC_PRESC_NUM		8
+	#elif (WINTC_GEN_CLK > 50000000)
+			#define WINTC_PRESC_NUM		4
+	#elif (WINTC_GEN_CLK > 20000000)
+			#define WINTC_PRESC_NUM		2
+	#elif (WINTC_GEN_CLK > 10000000)
+			#define WINTC_PRESC_NUM		1
+	#elif (WINTC_GEN_CLK > 5000000)
+			#define WINTC_PRESC_NUM		1
 	#else
-	#define PWM_IRQ						CONCAT2(PWM_TCC,_0_IRQ)
+			#define WINTC_PRESC_NUM		1
 	#endif
 
-	#define GCLK_PWM					CONCAT2(GCLK_,PWM_TCC)
-	#define PID_PWM						CONCAT2(PID_,PWM_TCC)
+	#define WINTC_PRESC_DIV				CONCAT2(TC_PRESCALER_DIV,WINTC_PRESC_NUM)
+	#define US2WINTC(v)					(((v)*(WINTC_GEN_CLK/1000/WINTC_PRESC_NUM)+500)/1000)
 
-	#if (PWM_GEN_CLK > 100000000)
-			#define PWM_PRESC_NUM		4
-	#elif (PWM_GEN_CLK > 50000000)
-			#define PWM_PRESC_NUM		2
-	#elif (PWM_GEN_CLK > 20000000)
-			#define PWM_PRESC_NUM		1
-	#elif (PWM_GEN_CLK > 10000000)
-			#define PWM_PRESC_NUM		1
-	#elif (PWM_GEN_CLK > 5000000)
-			#define PWM_PRESC_NUM		1
-	#else
-			#define PWM_PRESC_NUM		1
-	#endif
+	#define WINTC_RETRG_EVSYS_USER		CONCAT3(EVSYS_USER_, WIN_TC, _EVU)
+	#define WINTC_EVENT_GEN				CONCAT3(EVGEN_, WIN_TC, _OVF)
+	#define WINTC_EVSYS_CHANNEL			(WINTC_EVENT_GEN|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE)
 
-	#define PWM_PRESC_DIV				CONCAT2(TCC_PRESCALER_DIV,PWM_PRESC_NUM)
-	#define US2PWM(v)					(((v)*(PWM_GEN_CLK/PWM_PRESC_NUM/1000)+500)/1000)
-
-
-	#define PWM_CC_NUM					CONCAT2(PWM_TCC,_CC_NUM)
-
-	#define PWMLA_CC_NUM				(PWMLA_WO_NUM % PWM_CC_NUM)
-	#define PWMHA_CC_NUM				(PWMHA_WO_NUM % PWM_CC_NUM)
-	#define PWMLB_CC_NUM				(PWMLB_WO_NUM % PWM_CC_NUM)
-	#define PWMHB_CC_NUM				(PWMHB_WO_NUM % PWM_CC_NUM)
-
-	#define PWM_EVENT_GEN				CONCAT3(EVGEN_, PWM_TCC, _OVF)
-	#define PWM_EVSYS0_USER				CONCAT3(EVSYS_USER_, PWM_TCC, _EV_0)
-	#define PWM_EVSYS1_USER				CONCAT3(EVSYS_USER_, PWM_TCC, _EV_1)
-
-	#define PWM_DMCH_TRIGSRC			CONCAT3(DMCH_TRIGSRC_, PWM_TCC, _OVF)
-
-	inline void PWM_ClockEnable()		{ HW::GCLK->PCHCTRL[GCLK_PWM] = PWM_GEN|GCLK_CHEN; HW::MCLK->ClockEnable(PID_PWM); }
-
-	#ifdef TRM_SYNC_IRQ
-		#undef EVENT_PWM_SYNC
-	#endif
+	inline void WINTC_ClockEnable()		{ HW::GCLK->PCHCTRL[WINTC_GCLK] = WINTC_GEN|GCLK_CHEN; HW::MCLK->ClockEnable(WINTC_PID); }
 
 #else
-	//#error  Must defined PWM_TCC
-#endif
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-#ifdef WFG_TC
-
-	#define WFGTC						HW::WFG_TC
-	#define WFG_GEN						CONCAT2(GEN_,WFG_TC)
-	#define WFG_GEN_CLK					CONCAT2(CLK_,WFG_TC) 
-	#define WFG_IRQ						CONCAT2(WFG_TC,_IRQ)
-	#define GCLK_WFG					CONCAT2(GCLK_,WFG_TC)
-	#define PID_WFG						CONCAT2(PID_,WFG_TC)
-
-	#if (WFG_GEN_CLK > 100000000)
-			#define WFG_PRESC_NUM		8
-	#elif (WFG_GEN_CLK > 50000000)
-			#define WFG_PRESC_NUM		4
-	#elif (WFG_GEN_CLK > 20000000)
-			#define WFG_PRESC_NUM		2
-	#elif (WFG_GEN_CLK > 10000000)
-			#define WFG_PRESC_NUM		1
-	#elif (WFG_GEN_CLK > 5000000)
-			#define WFG_PRESC_NUM		1
-	#else
-			#define WFG_PRESC_NUM		1
-	#endif
-
-	#define WFG_PRESC_DIV				CONCAT2(TC_PRESCALER_DIV,WFG_PRESC_NUM)
-	#define US2WFG(v)					(((v)*(WFG_GEN_CLK/WFG_PRESC_NUM)+500000)/1000000)
-
-	#define WFG_EVSYS_USER				CONCAT3(EVSYS_USER_, WFG_TC, _EVU)
-
-	inline void WFG_ClockEnable()		{ HW::GCLK->PCHCTRL[GCLK_WFG] = WFG_GEN|GCLK_CHEN; HW::MCLK->ClockEnable(PID_WFG); }
-
-#else
-	//#error  Must defined PWM_TCC
-#endif
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-#ifdef ADC_TCC
-
-	#define ADCTCC						HW::ADC_TCC
-	#define ADC_GEN						CONCAT2(GEN_,ADC_TCC)
-	#define ADC_GEN_CLK					CONCAT2(CLK_,ADC_TCC) 
-	#define ADC_IRQ						CONCAT2(ADC_TCC,_0_IRQ)
-	#define GCLK_ADC					CONCAT2(GCLK_,ADC_TCC)
-	#define PID_ADC						CONCAT2(PID_,ADC_TCC)
-
-	#if (ADC_GEN_CLK > 100000000)
-			#define ADC_PRESC_NUM		4
-	#elif (ADC_GEN_CLK > 50000000)
-			#define ADC_PRESC_NUM		2
-	#elif (ADC_GEN_CLK > 20000000)
-			#define ADC_PRESC_NUM		1
-	#elif (ADC_GEN_CLK > 10000000)
-			#define ADC_PRESC_NUM		1
-	#elif (ADC_GEN_CLK > 5000000)
-			#define ADC_PRESC_NUM		1
-	#else
-			#define ADC_PRESC_NUM		1
-	#endif
-
-	#define ADC_PRESC_DIV				CONCAT2(TCC_PRESCALER_DIV,ADC_PRESC_NUM)
-	#define US2ADC(v)					(((v)*(ADC_GEN_CLK/ADC_PRESC_NUM/1000)+500)/1000)
-
-	#define ADC_EVSYS_USER				CONCAT3(EVSYS_USER_, ADC_TCC, _EV_0)
-
-	#define ADC_DMCH_TRIGSRC			CONCAT3(DMCH_TRIGSRC_, ADC_TCC, _OVF)
-
-	inline void ADC_ClockEnable()		{ HW::GCLK->PCHCTRL[GCLK_ADC] = ADC_GEN|GCLK_CHEN; HW::MCLK->ClockEnable(PID_ADC); }
-
-#else
-	//#error  Must defined PWM_TCC
+	#error  Must defined WIN_TC
 #endif
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// GENTCC_OVF ->	WINTC_EVU(RETRIGER)
+// 					BTCC_EV1(RETRIGER)
+//					MTCC_EV1(RETRIGER)
+// 
+// DNNKB_EXTINT ->	DNNKB_EVSYS_CHANNEL -> BTCC0_EVSYS_USER(BTCC_EV_0)
+// DNNKM_EXTINT ->	DNNKM_EVSYS_CHANNEL -> MTCC0_EVSYS_USER(MTCC_EV_0)
+// 
+// WINTC_OVF ->		BTCC_MC0 EVGEN_MC_0 -> bDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL B_DMA_IRQ(Win_DMA_IRQ)
+//					MTCC_MC0 EVGEN_MC_0 -> mDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL M_DMA_IRQ(Win_DMA_IRQ)
 
 #define DNNKB_EXTINT				(PIN_DNNKB&15)
 #define DNNKM_EXTINT				(PIN_DNNKM&15)
@@ -360,15 +306,15 @@ static void WDT_Init()
 #define WFG_EVSYS_USER				CONCAT3(EVSYS_USER_, WFG_TC, _EVU)
 
 #define DNNKB_EVSYS_CHANNEL			((EVGEN_EIC_EXTINT_0+DNNKB_EXTINT)|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE)
-#define DNNKB_EVSYS_USER			(BTCC0_EVSYS_USER)
+#define DNNKB_EVSYS_USER			(BTCC_COUNT_EVSYS_USER)
 
 #define DNNKM_EVSYS_CHANNEL			((EVGEN_EIC_EXTINT_0+DNNKM_EXTINT)|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE)
-#define DNNKM_EVSYS_USER			(MTCC0_EVSYS_USER)
+#define DNNKM_EVSYS_USER			(MTCC_COUNT_EVSYS_USER)
 
 //#define GEN_DIV						256
 //#define GEN_PRESC					TCC_PRESCALER_DIV256
-#define WIN_DIV						16
-#define WIN_PRESC					TC_PRESCALER_DIV16
+//#define WIN_DIV						16
+//#define WIN_PRESC					TC_PRESCALER_DIV16
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -471,9 +417,9 @@ void SetWindowTime(u16 wt)
 	{
 		wt = 2;
 	}
-	else if (wt > 2048)
+	else if (wt > 512)
 	{
-		wt = 2048;
+		wt = 512;
 	};
 
 	windowTime = wt;
@@ -695,23 +641,29 @@ static void PrepareWin()
 
 	if (curWinDsc == 0) return;
 
-	WinTC->CTRLA = TC_SWRST;
-	while(WinTC->SYNCBUSY);
+	winTC->CTRLA = TC_SWRST;
+	while(winTC->SYNCBUSY);
 
 	//WinTC->READREQ = TC_RCONT|0x18;
 
-	WinTC->CC16[0] = windowTime*(MCK_MHz/WIN_DIV) - 1; // временнќе окно
-	WinTC->CC16[1] = 0; // временнќе окно
-	WinTC->EVCTRL = TC_OVFEO;
-	WinTC->CTRLA = WIN_PRESC|TC_WAVEGEN_MFRQ;
+	winTC->CC16[0] = US2WINTC(windowTime) - 1; // временнќе окно
+	winTC->CC16[1] = 1; // временнќе окно
+	winTC->EVCTRL = TC_TCEI|TC_EVACT_RETRIGGER|TC_OVFEO;
+	winTC->WAVE = TC_WAVEGEN_MFRQ;
+	winTC->CTRLA = WINTC_PRESC_DIV;
 
 	curWinDsc->fireCount = 0;
 	curWinDsc->genWorkTime = genWorkTimeMinutes;
 	curWinDsc->temp = 0;
 	curWinDsc->winCount = windowCount;
 
-	bDMA.ReadPeripheral(&BTCC->CC[0], curWinDsc->b_data, windowCount, DMCH_TRIGACT_TRANSACTION|BTCC_DMCH_TRIGSRC, DMDSC_BEATSIZE_HWORD|DMDSC_BLOCKACT_INT);
-	mDMA.ReadPeripheral(&MTCC->CC[0], curWinDsc->m_data, windowCount, DMCH_TRIGACT_TRANSACTION|MTCC_DMCH_TRIGSRC, DMDSC_BEATSIZE_HWORD|DMDSC_BLOCKACT_INT);
+	bDMA.ReadPeripheral(&BTCC->CC[0], curWinDsc->b_data, windowCount, DMCH_TRIGACT_BURST|BTCC_DMCH_TRIGSRC, DMDSC_BEATSIZE_HWORD|DMDSC_BLOCKACT_INT);
+	mDMA.ReadPeripheral(&MTCC->CC[0], curWinDsc->m_data, windowCount, DMCH_TRIGACT_BURST|MTCC_DMCH_TRIGSRC, DMDSC_BEATSIZE_HWORD|DMDSC_BLOCKACT_INT);
+	
+	//HW::DMAC->CH[B_DMACH_NUM].INTENSET = DMCH_TCMPL;
+	//HW::DMAC->CH[M_DMACH_NUM].INTENSET = DMCH_TCMPL;
+
+	winTC->CTRLA |= TC_ENABLE;
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -726,10 +678,10 @@ static __irq void GenIRQ()
 
 	if (curWinDsc != 0)
 	{
-		WinTC->CTRLA = TC_ENABLE|TC_PRESCALER_DIV16|TC_WAVEGEN_MFRQ;
+		//winTC->CTRLA |= TC_ENABLE;
 
-		BTCC->CTRLBSET = TC_CMD_RETRIGGER;
-		MTCC->CTRLBSET = TC_CMD_RETRIGGER;
+		//BTCC->CTRLBSET = TC_CMD_RETRIGGER;
+		//MTCC->CTRLBSET = TC_CMD_RETRIGGER;
 
 		if (CheckGenEnabled()) { fireCount += 1; };
 	};
@@ -759,17 +711,26 @@ static __irq void Win_DMA_IRQ()
 
 	if ((DMAC->BUSYCH & ((1<<B_DMACH_NUM)|(1<<M_DMACH_NUM))) == 0)
 	{
-		WinTC->CTRLA &= ~TC_ENABLE;
+		winTC->CTRLBSET = TC_CMD_STOP;
 
 		readyWinList.Add(curWinDsc); curWinDsc = 0;
 
-		//freeWinList.Add(curWinDsc); curWinDsc = 0;
+		PrepareWin();
 	};
 
 	PIOA->BCLR(19);
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// EVENT_GEN(GENTCC_OVF) ->	WINTC_RETRG_EVSYS_USER(WINTC_EVU-RETRIGER)
+// 							BTCC_RETRG_EVSYS_USER(BTCC_EV1-RETRIGER)
+//							MTCC_RETRG_EVSYS_USER(MTCC_EV1-RETRIGER)
+// 
+// EVENT_DNNKB(DNNKB_EXTINT) ->	DNNKB_EVSYS_CHANNEL -> BTCC_CAPTR_EVSYS_USER(BTCC_EV_0)
+// EVENT_DNNKM(DNNKM_EXTINT) ->	DNNKM_EVSYS_CHANNEL -> MTCC_CAPTR_EVSYS_USER(MTCC_EV_0)
+// 
+// EVENT_WIN(WINTC_OVF) ->		BTCC_MC0 EVGEN_MC_0 -> bDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL B_DMA_IRQ(Win_DMA_IRQ)
+//								MTCC_MC0 EVGEN_MC_0 -> mDMA(DMCH_TRIGSRC_MC0) -> DMCH_TCMPL M_DMA_IRQ(Win_DMA_IRQ)
 
 void InitGen()
 {
@@ -778,9 +739,11 @@ void InitGen()
 	GENTCC_ClockEnable();
 	BTCC_ClockEnable();
 	MTCC_ClockEnable();
+	WINTC_ClockEnable();
 
 	HW::GCLK->PCHCTRL[EVENT_DNNKB+GCLK_EVSYS0] = GCLK_GEN(GEN_MCK)|GCLK_CHEN;
 	HW::GCLK->PCHCTRL[EVENT_DNNKM+GCLK_EVSYS0] = GCLK_GEN(GEN_MCK)|GCLK_CHEN;
+	HW::GCLK->PCHCTRL[EVENT_GEN+GCLK_EVSYS0] = GCLK_GEN(GEN_MCK)|GCLK_CHEN;
 	HW::GCLK->PCHCTRL[EVENT_WIN+GCLK_EVSYS0] = GCLK_GEN(GEN_MCK)|GCLK_CHEN;
 
 
@@ -799,17 +762,26 @@ void InitGen()
 	
 	EIC->CTRLA |= EIC_ENABLE;
 
+	EVSYS->CH[EVENT_GEN].CHANNEL = GENTCC_EVSYS_CHANNEL;
+	EVSYS->USER[WINTC_RETRG_EVSYS_USER] = EVENT_GEN+1;
+	EVSYS->USER[BTCC_RETRG_EVSYS_USER] = EVENT_GEN+1;
+	EVSYS->USER[MTCC_RETRG_EVSYS_USER] = EVENT_GEN+1;
+
 	EVSYS->CH[EVENT_DNNKB].CHANNEL = DNNKB_EVSYS_CHANNEL;
 	EVSYS->USER[DNNKB_EVSYS_USER] = EVENT_DNNKB+1;
 
 	EVSYS->CH[EVENT_DNNKM].CHANNEL = DNNKM_EVSYS_CHANNEL;
 	EVSYS->USER[DNNKM_EVSYS_USER] = EVENT_DNNKM+1;
 
-	EVSYS->CH[EVENT_BTCC_RETRG].CHANNEL = BTCC_EVENT_GEN|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE;
-	EVSYS->USER[BTCC1_EVSYS_USER] = EVENT_BTCC_RETRG+1;
+	//EVSYS->CH[EVENT_BTCC_RETRG].CHANNEL = BTCC_EVENT_GEN|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE;
+	//EVSYS->USER[BTCC1_EVSYS_USER] = EVENT_BTCC_RETRG+1;
 
-	EVSYS->CH[EVENT_MTCC_RETRG].CHANNEL = MTCC_EVENT_GEN|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE;
-	EVSYS->USER[MTCC1_EVSYS_USER] = EVENT_MTCC_RETRG+1;
+	//EVSYS->CH[EVENT_MTCC_RETRG].CHANNEL = MTCC_EVENT_GEN|EVSYS_PATH_ASYNCHRONOUS|EVSYS_EDGSEL_RISING_EDGE;
+	//EVSYS->USER[MTCC1_EVSYS_USER] = EVENT_MTCC_RETRG+1;
+
+	EVSYS->CH[EVENT_WIN].CHANNEL = WINTC_EVSYS_CHANNEL;
+	EVSYS->USER[BTCC_CAPTR_EVSYS_USER] = EVENT_WIN+1;
+	EVSYS->USER[MTCC_CAPTR_EVSYS_USER] = EVENT_WIN+1;
 
 
 	BTCC->CTRLA = TCC_SWRST;
@@ -817,29 +789,28 @@ void InitGen()
 
 	while(BTCC->SYNCBUSY|MTCC->SYNCBUSY);
 
-	//bTC->READREQ = TC_RCONT|0x10;
-	//mTC->READREQ = TC_RCONT|0x10;
 
-	BTCC->EVCTRL = TCC_TCEI0|TCC_EVACT0_COUNTEV|TCC_MCEI0|TCC_MCEO0;
-	MTCC->EVCTRL = TCC_TCEI0|TCC_EVACT0_COUNTEV|TCC_MCEI0|TCC_MCEO0;
+	BTCC->WAVE = TCC_WAVEGEN_NFRQ;
+	MTCC->WAVE = TCC_WAVEGEN_NFRQ;
 
-	//bTC->CC16[0] = ~1;
-	//mTC->CC16[0] = ~1;
+#ifdef WIN_TEST
 
-	BTCC->CTRLA = TC_WAVEGEN_NFRQ|TC_ENABLE;
-	MTCC->CTRLA = TC_WAVEGEN_NFRQ|TC_ENABLE;
+	BTCC->EVCTRL = TCC_TCEI1|TCC_EVACT1_RETRIGGER|TCC_MCEI0|TCC_MCEO0;
+	MTCC->EVCTRL = TCC_TCEI1|TCC_EVACT1_RETRIGGER|TCC_MCEI0|TCC_MCEO0;
 
-	// Win timer
+	BTCC->CTRLA = TC_PRESCALER_DIV256|TCC_CPTEN0|TCC_ENABLE;
+	MTCC->CTRLA = TC_PRESCALER_DIV256|TCC_CPTEN0|TCC_ENABLE;
 
-	//WinTC->CTRLA = TC_SWRST;
-	//while(WinTC->STATUS & TC_SYNCBUSY);
+#else
 
-	//WinTC->READREQ = TC_RCONT|0x18;
+	BTCC->EVCTRL = TCC_TCEI0|TCC_EVACT0_COUNTEV|TCC_TCEI1|TCC_EVACT1_RETRIGGER|TCC_MCEI0|TCC_MCEO0;
+	MTCC->EVCTRL = TCC_TCEI0|TCC_EVACT0_COUNTEV|TCC_TCEI1|TCC_EVACT1_RETRIGGER|TCC_MCEI0|TCC_MCEO0;
 
-	//WinTC->CC16[0] = windowTime*(MCK_MHz/WIN_DIV) - 1; // временнќе окно
-	//WinTC->CC16[1] = 0; // временнќе окно
-	//WinTC->EVCTRL = TC_OVFEO;
-	//WinTC->CTRLA = WIN_PRESC|TC_WAVEGEN_MFRQ;
+	BTCC->CTRLA = TCC_CPTEN0|TCC_ENABLE;
+	MTCC->CTRLA = TCC_CPTEN0|TCC_ENABLE;
+
+#endif
+
 
 	VectorTableExt[B_DMA_IRQ] = Win_DMA_IRQ;
 	CM4::NVIC->CLR_PR(B_DMA_IRQ);
@@ -849,9 +820,11 @@ void InitGen()
 	CM4::NVIC->CLR_PR(M_DMA_IRQ);
 	CM4::NVIC->SET_ER(M_DMA_IRQ);	
 
-	PIOA->SetWRCONFIG(PA18,	PORT_PMUX_E | PORT_WRPINCFG | PORT_PMUXEN | PORT_WRPMUX);
+	//PIOA->SetWRCONFIG(PA18,	PORT_PMUX_E | PORT_WRPINCFG | PORT_PMUXEN | PORT_WRPMUX);
 
 	InitWinLsit();
+
+	PIOA->SetWRCONFIG(PA04,	PORT_PMUX_E | PORT_WRPINCFG | PORT_PMUXEN | PORT_WRPMUX);
 
 	//PrepareWin();
 
@@ -865,7 +838,6 @@ void InitGen()
 	CM4::NVIC->CLR_PR(GENTCC_IRQ);
 	CM4::NVIC->SET_ER(GENTCC_IRQ);	
 
-
 	genTCC->WAVE = TCC_WAVEGEN_NPWM;
 	genTCC->PER = gen_period;
 	genTCC->CC[0] = US2GENTCC(10);
@@ -875,8 +847,12 @@ void InitGen()
 
 	genTCC->INTFLAG = ~0;
 
+	genTCC->EVCTRL = TCC_OVFEO;
+
 	genTCC->CTRLA = GENTCC_PRESC_DIV;
 	genTCC->CTRLA = GENTCC_PRESC_DIV|TCC_ENABLE;
+
+	PIOB->SetWRCONFIG(PB10,		PORT_PMUX_G | PORT_WRPINCFG | PORT_WRPMUX);
 
 	SetGenFreq(gen_freq);
 
@@ -970,7 +946,7 @@ void InitHardware()
 
 	//	HW::GCLK->GENCTRL[GEN_500K] 	= GCLK_DIV(50)	|GCLK_SRC_XOSC1		|GCLK_GENEN;
 
-	HW::PIOA->SetWRCONFIG(PA17, PORT_PMUX_M|PORT_WRPINCFG|PORT_PMUXEN|PORT_WRPMUX|PORT_PULLEN);
+	//HW::PIOA->SetWRCONFIG(PA17, PORT_PMUX_M|PORT_WRPINCFG|PORT_PMUXEN|PORT_WRPMUX|PORT_PULLEN);
 
 	//HW::GCLK->GENCTRL[GEN_EXT32K]	= GCLK_DIV(1)	|GCLK_SRC_GCLKIN	|GCLK_GENEN		;
 

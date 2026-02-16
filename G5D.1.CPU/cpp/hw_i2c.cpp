@@ -1,3 +1,6 @@
+#pragma O3
+#pragma Otime
+
 #include "hardware.h"
 
 //#include <types.h>

@@ -50,7 +50,7 @@ u32 fps;
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 static u16 manRcvData[10];
-static u16 manTrmData[50];
+static u16 manTrmData[128 + WINDOW_SIZE*2 + 16];
 static u16 manTrmBaud = 0;
 
 static const u16 manReqWord = 0x7000;
@@ -58,10 +58,10 @@ static const u16 manReqMask = 0xFF00;
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-u16 txbuf[128 + 512 + 16];
+//u16 txbuf[128 + 512 + 16];
 
-static u16 reqFireVoltage = 0;
-static u16 curFireVoltage = 300;
+//static u16 reqFireVoltage = 0;
+//static u16 curFireVoltage = 300;
 
 
 static u16 verDevice = VERSION;
@@ -122,8 +122,8 @@ static bool RequestMan_10(u16 *data, u16 len, MTB* mtb)
 	*(data++)	= mv.genFreq;							//	2. Частота генератора(Гц), 				
 	*(data++)	= mv.winCount;							//	3. Количество временных окон(шт), 					
 	*(data++)	= mv.winTime;							//	4. Длительность временного окна(мкс), 						
-	*(data++)	= mv.bLevel;							//	5. Уровень дискриминации МЗ(у.е), 					
-	*(data++)	= mv.mLevel;							//	6. Уровень дискриминации БЗ(у.е),					
+	*(data++)	= mv.mLevel;							//	5. Уровень дискриминации МЗ(у.е), 					
+	*(data++)	= mv.bLevel;							//	6. Уровень дискриминации БЗ(у.е),					
 
 	mtb->data1 = manTrmData;
 	mtb->len1 = data - start;
@@ -225,11 +225,11 @@ static bool RequestMan_90(u16 *data, u16 len, MTB* mtb)
 
 	switch(data[1])
 	{
-		case 0x01:	SetGenFreq(							mv.genFreq	= LIM(data[2], 4, 50)	);	break;	//	0x1 - Частота генератора(4..50 Гц), 
-		case 0x02:	SetWindowCount(						mv.winCount	= LIM(data[2], 2, 1024)	);	break;	//	0x2 - Количество временных окон(2..1024 шт), 
-		case 0x03:	SetWindowTime(						mv.winTime	= LIM(data[2], 2, 2048)	);	break;	//	0x3 - Длительность временного окна(2..2048 мкс), 
-		case 0x04:	AD5312_Set(AD5312_CHANNEL_LEVEL_M,	mv.mLevel	= MIN(data[2], 0x3FF)	);	break;	//	0x4 - Уровень дискриминации МЗ(у.е), 
-		case 0x05:	AD5312_Set(AD5312_CHANNEL_LEVEL_B,	mv.bLevel	= MIN(data[2], 0x3FF)	);	break;	//	0x5 - Уровень дискриминации БЗ(у.е),
+		case 0x01:	SetGenFreq(							mv.genFreq	= LIM(data[2], 4, 50)			);	break;	//	0x1 - Частота генератора(4..50 Гц), 
+		case 0x02:	SetWindowCount(						mv.winCount	= LIM(data[2], 2, WINDOW_SIZE)	);	break;	//	0x2 - Количество временных окон(2..1024 шт), 
+		case 0x03:	SetWindowTime(						mv.winTime	= LIM(data[2], 2, 512)			);	break;	//	0x3 - Длительность временного окна(2..2048 мкс), 
+		case 0x04:	AD5312_Set(AD5312_CHANNEL_LEVEL_M,	mv.mLevel	= MIN(data[2], 0x3FF)			);	break;	//	0x4 - Уровень дискриминации МЗ(у.е), 
+		case 0x05:	AD5312_Set(AD5312_CHANNEL_LEVEL_B,	mv.bLevel	= MIN(data[2], 0x3FF)			);	break;	//	0x5 - Уровень дискриминации БЗ(у.е),
 
 		default:
 
@@ -673,7 +673,7 @@ static void UpdateTemp()
 //static u16 prevCurFV = 0;
 //static i16 dCurFV = 0;
 //static i16 dDstFV = 0;
-
+/*
 static void UpdateHV()
 {
 	static byte i = 0;
@@ -875,7 +875,7 @@ static void UpdateHV()
 
 	};
 }
-
+*/
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 static void InitMainVars()
@@ -1098,10 +1098,10 @@ static void InitTaskList()
 	{
 		Task(UpdateTemp,		US2CTM(100)	),
 		Task(SaveVars,			US2CTM(100)	),
-		Task(UpdateHV,			US2CTM(100)	),
 //		Task(UpdateCom,			US2CTM(1)	),
 		Task(UpdateHardware,	US2CTM(1)	),
-		Task(UpdateMan,			US2CTM(100)	)
+		Task(UpdateMan,			US2CTM(100)	),
+		Task(UpdateWindow,		US2CTM(1000))
 	};
 
 	for (u16 i = 0; i < ArraySize(tsk); i++) taskList.Add(tsk+i);
@@ -1140,7 +1140,7 @@ int main()
 
 		fc++;
 
-		if (tm.Check(250))
+		if (tm.Check(1000))
 		{
 			fps = fc; fc = 0; 
 
