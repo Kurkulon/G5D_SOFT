@@ -91,6 +91,7 @@
     <ClCompile Include="cpp\hw_i2c.cpp" />
     <ClCompile Include="cpp\main.cpp" />
     <ClCompile Include="cpp\manch.cpp" />
+    <ClCompile Include="cpp\pack.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -10,6 +10,8 @@
 #include "hw_com.h"
 //#include "G_TRM.h"
 #include "TaskList.h"
+#include "FLASH\nand_ecc.h"
+#include "MQCODER\mqcoder.h"
 
 //#include "G_TRM.H"
 
@@ -51,6 +53,8 @@ u32 fps;
 
 static u16 manRcvData[10];
 static u16 manTrmData[128 + WINDOW_SIZE*2 + 16];
+static u16 manPckData[128 + WINDOW_SIZE*4 + 16];
+static u16 manUnpData[128 + WINDOW_SIZE*4 + 16];
 static u16 manTrmBaud = 0;
 
 static const u16 manReqWord = 0x7000;
@@ -78,6 +82,17 @@ static byte svCount = 0;
 
 u16 fireAmp = 0;
 u16 fireFreq = 3000;
+
+i16 loc = 0;
+i16 loc_min = 0x7FFF;
+i16 loc_max = 0x8000;
+u32 loc_gk = 0;
+i16 loc_tension = 0;
+u32 loc_period = 0;
+u16 loc_req_count = 0;
+u16 framErrorMask = 0;
+
+enum { FRAM_ERROR_LOADVARS = 0, FRAM_ERROR_ECC, FRAM_ERROR_PARECC, FRAM_CORR_ECC, FRAM_NOACK };
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -150,41 +165,92 @@ static bool RequestMan_20(u16 *data, u16 len, MTB* mtb)
 
 	__packed u16 *start = manTrmData;
 
-	manTrmData[0] = data[0];//(manReqWord & manReqMask) | 0x20;
+	manTrmData[0] = data[0];					//	1. Ответное слово (принятая команда)
 	
 	data = manTrmData;
 	data++;
 
 	u16 wc;
+												
+	*(data++)	= GetFireCount();				//	2. Количество вспышек(ushort)		
+	*(data++)	= GetGenWorkTime();				//	3. Наработка генератора(мин)(ushort)						
+	*(data++)	= temp;							//	4. Температура в приборе(0.1 гр)(short)									
+	*(data++)	= wc = mv.winCount;				//	5. Количество временных окон(шт)					
+	*(data++)	= mv.winTime;					//	6. Длительность временного окна(мкс)						
+	*(data++)	= loc;							//	7. Локатор
+	*(data++)	= loc_min;						//	8. Локатор минимум
+	*(data++)	= loc_max;						//	9. Локатор максимум
+	*(data++)	= MIN(loc_gk, 65535);			//	10. ГК(имп/период)
+	*(data++)	= loc_period;					//	11,12. Период(мс)(uint32)
+	*(data++)	= loc_period>>16;				
+	*(data++)	= loc_req_count;				//	13. Счётчик запросов ЛК-ГК			
+	*(data++)	= framErrorMask;				//	14. Статус ошибог FRAM
 
-	*(data++)	= GetFireCount();				//2. Количество вспышек(ushort)						
-	*(data++)	= GetGenWorkTime();				//3. Наработка генератора(мин)(ushort)								
-	*(data++)	= temp;							//4. Температура в приборе(0.1 гр)(short)										
-	*(data++)	= wc = mv.winCount;				//5. Количество временных окон(шт)								
-	*(data++)	= mv.winTime;					//6. Длительность временного окна(мкс)								
+	loc_gk = 0;
+	loc_period = 0;
+	loc_min = 0x7FFF;
+	loc_max = 0x8000;
 
-	u16 n = 6;
+	//u16 n = 6;
 
 	for (u16 i = 0; i < wc; i++)
 	{
 		u32 tm = m_ts[i]; m_ts[i] = 0;
 		u32 tb = b_ts[i]; b_ts[i] = 0;
 
-		data[0]		= MIN(tm, 0xFFFF);			//7..x. Спектр МЗ(ushort)
-		data[wc]	= MIN(tb, 0xFFFF);			//x..y. Спектр БЗ(ushort)
+		data[0]		= MIN(tm, 0xFFFF);			//	15..x. Спектр МЗ(ushort)
+		data[wc]	= MIN(tb, 0xFFFF);			//	x..y. Спектр БЗ(ushort)
 
 		data++;
 	};
 
 	data += wc;
 
-	mtb->data1 = manTrmData;
-	mtb->len1 = data - start;
+	manPckData[0] = manTrmData[0];
+	manPckData[1] = data-start-1;
+
+	byte *src = (byte*)(manTrmData+1);
+	byte *dst = (byte*)(manPckData+2);
+
+	u32 plen = MQcompress(src, manPckData[1]*2, dst);
+
+	dst[plen] = ~0;
+
+	//MQdecompress(dst, plen, (byte*)manUnpData, manPckData[1]*2);
+
+	mtb->data1 = manPckData;
+	mtb->len1 = 2 + (plen+1)/2;
 	mtb->data2 = 0;
 	mtb->len2 = 0;
 
 	return true;
 }
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+//static bool RequestMan_30(u16 *data, u16 len, MTB* mtb)
+//{
+//	if (data == 0 || len == 0 || len > 2 || mtb == 0) return false;
+//
+//	__packed u16 *start = manTrmData;
+//
+//	data = manTrmData;
+//
+//	*(data++)	= (manReqWord & manReqMask) | 0x30;		//	1. ответное слово
+//	*(data++)	= loc;									//	2. Локатор
+//	*(data++)	= loc_min;								//	3. Локатор минимум			
+//	*(data++)	= loc_max;								//	4. Локатор максимум					
+//	*(data++)	= loc_gk;								//	5. ГК(имп/период)			
+//	*(data++)	= loc_period;							//	6,7. Период(мс)(uint32)			
+//	*(data++)	= loc_period>>16;						//	6,7. Период(мс)(uint32)			
+//
+//	mtb->data1 = manTrmData;
+//	mtb->len1 = data - start;
+//	mtb->data2 = 0;
+//	mtb->len2 = 0;
+//
+//	return true;
+//}
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -306,6 +372,7 @@ static bool RequestMan(u16 *buf, u16 len, MTB* mtb)
 		case 0x0: 	r = RequestMan_00(buf, len, mtb); break;
 		case 0x1: 	r = RequestMan_10(buf, len, mtb); break;
 		case 0x2: 	r = RequestMan_20(buf, len, mtb); break;
+	//	case 0x3:	r = RequestMan_30(buf, len, mtb); break;
 		case 0x8: 	r = RequestMan_80(buf, len, mtb); break;
 		case 0x9:	r = RequestMan_90(buf, len, mtb); break;
 		case 0xA:	r = RequestMan_A0(buf, len, mtb); break;
@@ -394,146 +461,6 @@ static void UpdateMan()
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-typedef bool (*REQF)(byte *req, u16 len, ComPort::WriteBuffer *wb);
-
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#ifdef kdjfhgkdfhgjdfg
-
-static bool Request01(byte *data, u16 len, ComPort::WriteBuffer *wb)
-{
-	// Запуск импульса излучателя
-
-	ReqTrm01::Req &req = *((ReqTrm01::Req*)data);
-	
-	PrepareFire(req.n, req.fireFreq, req.fireAmp, req.fireCount, req.fireDuty);
-
-	wb->data = 0;
-	wb->len = 0;
-
-	return true;
-}
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-static bool Request02(byte *data, u16 len, ComPort::WriteBuffer *wb)
-{
-	static RspTrm02 rsp;
-
-	ReqTrm02::Req &req = *((ReqTrm02::Req*)data);
-
-	reqFireVoltage = req.reqHV;
-
-	if (req.numDevValid) mv.numDevice = req.numDev, numDevValid = true;
-	
-	if (req.saveParams) SaveMainParams();
-
-	rsp.func		= req.func;
-	rsp.numDevValid = numDevValid;
-	rsp.numdev		= mv.numDevice;
-	rsp.verdev		= VERSION;
-	rsp.hv			= curFireVoltage;
-	rsp.temp		= temp;
-	rsp.crc			= GetCRC16(&rsp, sizeof(rsp)-sizeof(rsp.crc));
-
-	wb->data	= &rsp;
-	wb->len		= sizeof(rsp);
-
-	return false;
-}
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-static bool Request03(byte *data, u16 len, ComPort::WriteBuffer *wb)
-{
-	static u16 buf[2];
-
-//	ReqTrm03::Req &req = *((ReqTrm03::Req*)data);
-
-	curRsp72 = GetReadyRsp72();
-
-	if (curRsp72 == 0)
-	{
-		buf[0] = TRM_RSP03_RW;
-		buf[1] = GetCRC16(buf, 2);
-
-		wb->data = buf;
-		wb->len = sizeof(buf);
-	}
-	else
-	{
-		RspTrm03 &rsp = curRsp72->h;
-
-		rsp.rw = TRM_RSP03_RW;
-
-		i16 max = 0;
-
-		for (u16 i = 0; i < rsp.sl; i++)
-		{
-			i16 t = rsp.data[i]-0x800;
-			t *= 2;
-			rsp.data[i] = t;
-
-			if (t < 0) t = -t;
-			if (t > max) max = t;
-		};
-
-		wb->data = &rsp;
-		wb->len = sizeof(rsp) - sizeof(rsp.data) - sizeof(rsp.crc) + rsp.sl*2;
-
-		rsp.amp = max;
-		rsp.data[rsp.sl] = GetCRC16(wb->data, wb->len);
-
-		wb->len += 2;
-	};
-
-	return false;
-}
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-static REQF listReq[3] = { Request01, Request02, Request03 };
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-static bool UpdateRequest(ComPort::WriteBuffer *wb, ComPort::ReadBuffer *rb)
-{
-	//static Req nulReq;
-
-	static const byte fl[3] = { sizeof(ReqTrm01::r[0])-1, sizeof(ReqTrm02::r[0])-1, sizeof(ReqTrm03::r[0])-1 };
-
-	if (rb == 0 || rb->len < 4) return false;
-
-	bool result = false;
-
-	u16 rlen = rb->len;
-
-	byte *p = (byte*)rb->data;
-
-	while(rlen > 3)
-	{
-		byte len = p[0];
-		byte func = p[1]-1;
-
-		if (func < 4 && len == fl[func] && len < rlen && GetCRC16(p+1, len) == 0)
-		{
-			//Req *req = (Req*)p;
-
-			result = listReq[func](p, len+1, wb);
-
-			break;
-		}
-		else
-		{
-			p += 1;
-			rlen -= 1;
-		};
-	};
-
-	return result;
-}
-
-//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 static void UpdateCom()
 {
 	static byte i = 0;
@@ -547,9 +474,13 @@ static void UpdateCom()
 	{
 		case 0:
 
-			rb.data = buf;
-			rb.maxLen = sizeof(buf);
-			comdsp.Read(&rb, MS2COM(5000), US2COM(100));
+			buf[0] = 0x220;
+
+			wb.data = buf;
+			wb.len = 2;
+
+			comdsp.Write(&wb);
+
 			i++;
 
 			break;
@@ -558,29 +489,11 @@ static void UpdateCom()
 
 			if (!comdsp.Update())
 			{
-				if (rb.recieved && rb.len >= 6)
-				{
-					ctm.Reset();
+				rb.data = buf;
+				rb.maxLen = sizeof(buf);
+				comdsp.Read(&rb, MS2COM(10), US2COM(500));
 
-					if (UpdateRequest(&wb, &rb))
-					{
-						i += 2;
-					}
-					else if (wb.data != 0 && wb.len != 0)
-					{
-						comdsp.Write(&wb);
-
-						i++;
-					}
-					else
-					{
-						i = 0;
-					};
-				}
-				else
-				{
-					i = 0;
-				};
+				i++;
 			};
 
 			break;
@@ -589,26 +502,33 @@ static void UpdateCom()
 
 			if (!comdsp.Update())
 			{
-				if (curRsp72 != 0) FreeRsp72(curRsp72), curRsp72 = 0;
+				if (rb.recieved && rb.len >= 16 && buf[0] == 0x220)
+				{
+					loc				= buf[1];
+					loc_min			= MIN((i16)buf[2], loc_min);
+					loc_max			= MAX((i16)buf[2], loc_max);
+					loc_gk			+= buf[4];
+					loc_tension		= buf[5];
+					loc_period		+= buf[6]|(buf[7]<<16);
+					loc_req_count	+= 1;
+				};
 
-				i = 0;
+				i++;
 			};
 
 			break;
 
 		case 3:
 
-			if (IsFireOK() || ctm.Check(MS2CTM(50)))
+			if (ctm.Check(MS2CTM(100)))
 			{
-				DisableFire();
-
 				i = 0;
 			};
 
 			break;
 	};
 }
-#endif
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 static void UpdateTemp()
@@ -897,11 +817,13 @@ static void LoadVars()
 	static DSCI2C dsc;
 	static u16 romAdr = 0;
 	
-	byte buf[sizeof(mv)*2+4];
+	byte buf[sizeof(mv)*2+16];
 
 	bool c2 = false;
 
 	bool loadVarsOk = false;
+	
+	framErrorMask = 0;
 
 	romAdr = ReverseWord(FRAM_I2C_MAINVARS_ADR);
 
@@ -918,16 +840,28 @@ static void LoadVars()
 		while (!dsc.ready) { I2C_Update(); };
 	};
 
+	if (!dsc.ack) framErrorMask |= (1<<FRAM_NOACK);
+
 	PointerCRC p(buf);
+
+	u32 err = 0, corrErr = 0, parErr = 0;
 
 	for (byte i = 0; i < 2; i++)
 	{
+		Nand_ECC_Corr(p.b, sizeof(mv)+2, 256, p.b+sizeof(mv)+2, &err, &corrErr, &parErr);
+
 		p.CRC.w = 0xFFFF;
 		p.ReadArrayB(&mv, sizeof(mv));
 		p.ReadW();
+		p.b += 3;
 
 		if (p.CRC.w == 0) { c2 = true; break; };
 	};
+
+	if (!c2)		framErrorMask |= 1<<FRAM_ERROR_LOADVARS;
+	if (err)		framErrorMask |= 1<<FRAM_ERROR_ECC;
+	if (corrErr)	framErrorMask |= 1<<FRAM_CORR_ECC;
+	if (parErr)		framErrorMask |= 1<<FRAM_ERROR_PARECC;
 
 	SEGGER_RTT_WriteString(0, RTT_CTRL_TEXT_BRIGHT_WHITE "FRAM I2C - "); SEGGER_RTT_WriteString(0, (c2) ? (RTT_CTRL_TEXT_BRIGHT_GREEN "OK\n") : (RTT_CTRL_TEXT_BRIGHT_RED "ERROR\n"));
 
@@ -955,7 +889,7 @@ static void SaveVars()
 {
 	static DSCI2C dsc;
 	static u16 romAdr = 0;
-	static byte buf[sizeof(mv) * 2 + 8];
+	static byte buf[sizeof(mv) * 2 + 16];
 
 	static byte i = 0;
 	static TM32 tm;
@@ -980,9 +914,12 @@ static void SaveVars()
 
 			for (byte j = 0; j < 2; j++)
 			{
+				byte* start = p.b;
 				p.CRC.w = 0xFFFF;
 				p.WriteArrayB(&mv, sizeof(mv));
 				p.WriteW(p.CRC.w);
+				
+				Nand_ECC_Calc(start, p.b-start, 256, p.b); p.b += 3; 
 			};
 
 			romAdr = ReverseWord(FRAM_I2C_MAINVARS_ADR);
@@ -1098,7 +1035,7 @@ static void InitTaskList()
 	{
 		Task(UpdateTemp,		US2CTM(100)	),
 		Task(SaveVars,			US2CTM(100)	),
-//		Task(UpdateCom,			US2CTM(1)	),
+		Task(UpdateCom,			US2CTM(100)	),
 		Task(UpdateHardware,	US2CTM(1)	),
 		Task(UpdateMan,			US2CTM(100)	),
 		Task(UpdateWindow,		US2CTM(1000))
@@ -1123,7 +1060,7 @@ int main()
 
 	InitTaskList();
 
-	//comdsp.Connect(ComPort::ASYNC, TRM_COM_BAUDRATE, TRM_COM_PARITY, TRM_COM_STOPBITS);
+	comdsp.Connect(ComPort::ASYNC, 250000, 2, 2);
 
 	u32 fc = 0;
 	u16 n = 0;
