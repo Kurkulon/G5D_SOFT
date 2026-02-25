@@ -1,5 +1,5 @@
-#pragma O3
-#pragma Otime
+//#pragma O3
+//#pragma Otime
 
 #include "hardware.h"
 

@@ -535,7 +535,7 @@ static void UpdateSaveGenTime()
 	static byte buf[sizeof(genWorkTimeMinutes) * 2 + 8];
 
 	static byte i = 0;
-	static TM32 tm;
+	//static TM32 tm;
 
 	PointerCRC p(buf);
 
@@ -570,7 +570,7 @@ static void UpdateSaveGenTime()
 		dsc.rlen = 0;
 		dsc.adr = 0x50;
 
-		tm.Reset();
+		//tm.Reset();
 
 		I2C_AddRequest(&dsc);
 
@@ -580,7 +580,7 @@ static void UpdateSaveGenTime()
 
 	case 2:
 
-		if (dsc.ready || tm.Check(100))
+		if (dsc.ready /*|| tm.Check(100)*/)
 		{
 			i = 0;
 		};
@@ -928,6 +928,46 @@ static void Update_AD5312()
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+u16 Get_FBPOW2()
+{
+#ifdef CPU_SAME53
+	HW::FBPOW2_ADC->SWTRIG = ADC_START;
+	return (HW::FBPOW2_ADC->RESULT * 2783) >> 16;
+#else
+	return 0;
+#endif
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+static void Init_ADC()
+{
+#ifdef CPU_SAME53
+
+	HW::GCLK->PCHCTRL[CONCAT2(GCLK_,FBPOW2_ADC)] = GEN_MCK|GCLK_CHEN; 
+	HW::MCLK->ClockEnable(CONCAT2(PID_,FBPOW2_ADC)); 
+
+	PIO_FBPOW2->SetWRCONFIG(FBPOW2,	PORT_PMUX_B|PORT_WRPMUX|PORT_WRPINCFG|PORT_PMUXEN);
+
+	HW::FBPOW2_ADC->CTRLB = ADC_RESSEL_16BIT|ADC_FREERUN;
+
+	HW::FBPOW2_ADC->REFCTRL = ADC_REFSEL_VDDANA|ADC_REFCOMP;
+
+	HW::FBPOW2_ADC->INPUTCTRL = CONCAT2(ADC_MUXPOS_AIN,FBPOW2_AIN);
+
+	HW::FBPOW2_ADC->AVGCTRL = ADC_SAMPLENUM_1024;
+
+	HW::FBPOW2_ADC->SAMPCTRL = ADC_SAMPLEN(63);
+
+	HW::FBPOW2_ADC->CTRLA = ADC_PRESCALER_DIV256|ADC_ENABLE; 
+
+	HW::FBPOW2_ADC->SWTRIG = ADC_START;
+
+#endif
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 void InitHardware()
 {
 	SEGGER_RTT_WriteString(0, RTT_CTRL_TEXT_BRIGHT_YELLOW "Hardware Init ... ");
@@ -968,6 +1008,8 @@ void InitHardware()
 	InitManTransmit();
 	InitGen();
 	Init_AD5312();
+
+	Init_ADC();
 
 	WDT_Init();
 
