@@ -53,7 +53,7 @@ u32 fps;
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 static u16 manRcvData[10];
-static u16 manTrmData[2048];
+static u16 manTrmData[4096];
 static u16 manPckData[128 + WINDOW_SIZE*4 + 16];
 static u16 manUnpData[128 + WINDOW_SIZE*4 + 16];
 static u16 manTrmBaud = 0;
