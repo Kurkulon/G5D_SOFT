@@ -16,7 +16,8 @@
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-#define COMPRESS_REQ20
+//#define COMPRESS_REQ20
+#define TLS_GORIZONT
 
 //#define FRAM_SPI_MAINVARS_ADR 0
 
@@ -218,7 +219,10 @@
 	// ++++++++++++++	MANCH	++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 	#define MAN_TRANSMIT_V2
+
+	#ifdef TLS_GORIZONT
 	#define MAN_TRANSMIT_LENPTR
+	#endif
 
 	#define PIO_MANCH		HW::PIOA
 	#define PIN_L1			8 

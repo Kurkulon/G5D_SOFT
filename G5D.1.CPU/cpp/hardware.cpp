@@ -932,7 +932,7 @@ u16 Get_FBPOW2()
 {
 #ifdef CPU_SAME53
 	HW::FBPOW2_ADC->SWTRIG = ADC_START;
-	return (HW::FBPOW2_ADC->RESULT * 2783) >> 16;
+	return (HW::FBPOW2_ADC->RESULT * 2753) >> 16;
 #else
 	return 0;
 #endif

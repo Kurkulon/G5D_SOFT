@@ -62,8 +62,10 @@ static u16 tlsTrmBaud = 0;
 static const u16 manReqWord = 0x7000;
 static const u16 manReqMask = 0xFF00;
 
+#ifdef TLS_GORIZONT
 static const u16 tlsReqWord = 0x0000;
 static const u16 tlsReqMask = 0xFF00;
+#endif
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -402,6 +404,7 @@ static bool RequestMan(u16 *buf, u16 len, MTB* mtb)
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#ifdef TLS_GORIZONT
 
 static bool RequestTLS_00(u16 *data, u16 len, MTB* mtb)
 {
@@ -572,6 +575,7 @@ static bool RequestTLS(u16 *buf, u16 len, MTB* mtb)
 
 	return r;
 }
+#endif // 	#ifdef TLS_GORIZONT
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -624,6 +628,7 @@ static void UpdateMan()
 					{
 						i++;
 					}
+#ifdef TLS_GORIZONT
 					else if ((manRcvData[0] & tlsReqMask) == tlsReqWord && RequestTLS(manRcvData, mrb.len, &mtb))
 					{
 						i++;
@@ -632,6 +637,12 @@ static void UpdateMan()
 					{
 						i += 3;
 					};
+#else
+					else
+					{
+						i = 0;
+					};
+#endif
 				};
 			}
 			else if (mrb.len > 0)
@@ -660,6 +671,8 @@ static void UpdateMan()
 			};
 
 			break;
+
+	#ifdef TLS_GORIZONT
 
 		case 4:
 
@@ -738,6 +751,9 @@ static void UpdateMan()
 
 			break;
 		};
+
+	#endif
+
 	};
 }
 
@@ -1140,6 +1156,7 @@ static void LoadVars()
 		if (p.CRC.w == 0) { c2 = true; break; };
 	};
 
+	if (c2)			framErrorMask |= 1<<FRAM_LOAD_OK;
 	if (!c2)		framErrorMask |= 1<<FRAM_ERROR_LOADVARS;
 	if (err)		framErrorMask |= 1<<FRAM_ERROR_ECC;
 	if (corrErr)	framErrorMask |= 1<<FRAM_CORR_ECC;
@@ -1226,6 +1243,8 @@ static void SaveVars()
 
 			if (dsc.ready || tm.Check(100))
 			{
+				if (!dsc.ack) framErrorMask |= (1<<FRAM_NOACKW);
+
 				i = 0;
 			};
 
@@ -1460,13 +1479,17 @@ static void InitTaskList()
 {
 	static Task tsk[] =
 	{
-		Task(UpdateTemp,		US2CTM(100)	),
-		Task(SaveVars,			US2CTM(100)	),
-//		Task(UpdateCom,			US2CTM(100)	),
-		Task(UpdateHardware,	US2CTM(1)	),
-		Task(UpdateMan,			US2CTM(10)	),
-		Task(UpdateWindow,		US2CTM(1000)),
-		Task(TestFRAM,			US2CTM(100))
+		Task(UpdateTemp,		US2CTM(100)		),
+		Task(SaveVars,			US2CTM(100)		),
+	
+	#ifndef TLS_GORIZONT
+		Task(UpdateCom,			US2CTM(100)		),
+	#endif
+
+		Task(UpdateHardware,	US2CTM(1)		),
+		Task(UpdateMan,			US2CTM(10)		),
+//		Task(TestFRAM,			US2CTM(100)		),
+		Task(UpdateWindow,		US2CTM(1000)	)
 	};
 
 	for (u16 i = 0; i < ArraySize(tsk); i++) taskList.Add(tsk+i);
