@@ -159,7 +159,15 @@ static bool RequestMan_10(u16 *data, u16 len, MTB* mtb)
 
 static bool RequestMan_20(u16 *data, u16 len, MTB* mtb)
 {
+	static u32 pt = 0;
+
 	if (data == 0 || len == 0 || len > 1 || mtb == 0) return false;
+
+	u32 t = GetCYCCNT();
+	u32 dt = t - pt;
+	pt = t;
+	
+	dt /= MCK_MHz;
 
 	if (data[0] & 1)
 	{
@@ -179,21 +187,23 @@ static bool RequestMan_20(u16 *data, u16 len, MTB* mtb)
 
 	u16 wc;
 												
-	*(data++)	= GetFireCount();				//	2. Количество вспышек(ushort)		
-	*(data++)	= GetGenWorkTime();				//	3. Наработка генератора(мин)(ushort)						
-	*(data++)	= temp;							//	4. Температура в приборе(0.1 гр)(short)									
-	*(data++)	= wc = mv.winCount;				//	5. Количество временных окон(шт)					
-	*(data++)	= mv.winTime;					//	6. Длительность временного окна(мкс)						
-	*(data++)	= loc;							//	7. Локатор
-	*(data++)	= loc_min;						//	8. Локатор минимум
-	*(data++)	= loc_max;						//	9. Локатор максимум
-	*(data++)	= MIN(loc_gk, 65535);			//	10. ГК(имп/период)
-	*(data++)	= loc_period;					//	11,12. Период(мс)(uint32)
-	*(data++)	= loc_period>>16;				
-	*(data++)	= loc_req_count;				//	13. Счётчик запросов ЛК-ГК			
-	*(data++)	= framErrorMask;				//	14. Статус ошибог FRAM
-	*(data++)	= Get_FBPOW2();					//	15. Напряжение жилы (0.1В)
-	
+	*(data++)	= GetFireCount();				//	2. Количество вспышек(ushort)
+	*(data++)	= GetGenWorkTime();				//	3. Наработка генератора(мин)(ushort)					
+	*(data++)	= temp;							//	4. Температура в приборе(0.1 гр)(short)								
+	*(data++)	= wc = mv.winCount;				//	5. Количество временных окон(шт)			
+	*(data++)	= mv.winTime;					//	6. Длительность временного окна(мкс)
+	*(data++)	= dt;							//	7,8. Период накопления БЗ,МЗ (мкс)(uint32)
+	*(data++)	= dt>>16;						//	7,8. Период накопления БЗ,МЗ (мкс)(uint32)
+	*(data++)	= loc;							//	9. Локатор					
+	*(data++)	= loc_min;						//	10. Локатор минимум
+	*(data++)	= loc_max;						//	11. Локатор максимум
+	*(data++)	= MIN(loc_gk, 65535);			//	12. ГК(имп/период)
+	*(data++)	= loc_period;					//	13,14. Период накопления ГК(мкс)(uint32)
+	*(data++)	= loc_period>>16;				//	13,14. Период накопления ГК(мкс)(uint32)
+	*(data++)	= loc_req_count;				//	15. Счётчик запросов ЛК-ГК
+	*(data++)	= framErrorMask;				//	16. Статус ошибог FRAM
+	*(data++)	= Get_FBPOW2();					//	17. Напряжение жилы (0.1В)
+
 	framErrorMask = 0;
 
 	loc_gk = 0;
@@ -207,7 +217,7 @@ static bool RequestMan_20(u16 *data, u16 len, MTB* mtb)
 		u32 tm = m_ts[i]; m_ts[i] = 0;
 		u32 tb = b_ts[i]; b_ts[i] = 0;
 
-		data[0]		= MIN(tm, 0xFFFF);			//	15..x. Спектр МЗ(ushort)
+		data[0]		= MIN(tm, 0xFFFF);			//	18..x. Спектр МЗ(ushort)
 		data[wc]	= MIN(tb, 0xFFFF);			//	x..y. Спектр БЗ(ushort)
 
 		data++;
