@@ -225,11 +225,11 @@
 	#endif
 
 	#define PIO_MANCH		HW::PIOA
-	#define PIN_L1			8 
-	#define PIN_L2			9 
+	#define PIN_L1			9			// «убец вверх 
+	#define PIN_L2			8 
 	#define MANCH_PMUX		PORT_PMUX_F
-	#define L1_WO_NUM		0
-	#define L2_WO_NUM		1
+	#define L1_WO_NUM		1
+	#define L2_WO_NUM		0
 
 	#define L1				(1UL<<PIN_L1)
 	#define L2				(1UL<<PIN_L2)

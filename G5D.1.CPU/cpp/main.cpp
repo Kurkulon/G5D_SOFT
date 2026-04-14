@@ -1111,9 +1111,9 @@ static void InitMainVars()
 	mv.numDevice	= 11111;
 	mv.genFreq		= 10;	
 	mv.winCount		= 64;	
-	mv.winTime		= 64;	
-	mv.bLevel		= 0;		
-	mv.mLevel		= 0;		
+	mv.winTime		= 32;	
+	mv.bLevel		= 430;		
+	mv.mLevel		= 430;		
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
